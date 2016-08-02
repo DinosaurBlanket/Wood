@@ -1,0 +1,4 @@
+flags = "-Wall -g -std=gnu11"
+env = Environment(CC = "gcc", CCFLAGS = flags)
+src = ["main.cpp"]
+env.Program("cscd", src, LIBS = [])
