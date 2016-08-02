@@ -10,18 +10,13 @@ int main(int argc, char** argv ) {
 	}
   char* fileName = argv[1];
 	std::ifstream infile(fileName);
-	if (!infile) {
+	if (infile.fail()) {
 		printf("could not open '%s'\n", fileName);
 		return 2;
 	}
 	
 	std::string s;
-	char fchar;
-	for(;;) {
-		fchar = infile.get();
-		if (fchar == EOF) break;
-		s.push_back(fchar);
-	}
+	while (infile.peek() != EOF) s.push_back(infile.get());
 	std::cout << s;
 	
 	infile.close();
