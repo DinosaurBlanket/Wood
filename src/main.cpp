@@ -3,7 +3,9 @@
 #include <iostream>
 
 void handleToken(std::string &t) {
+	if (!t.length()) return;
 	std::cout << t << std::endl;
+	t.clear();
 }
 
 int main(int argc, char** argv ) {
@@ -18,31 +20,35 @@ int main(int argc, char** argv ) {
 		return 2;
 	}
 	
-	uint32_t curLine;
+	uint32_t curLine = 0;
+	uint32_t commentDepth = 0;
+	char inchar = '\0';
 	std::string token;
-	char curFChar = '\0';
-	char prvFChar = '\0';
 	while (infile.peek() != EOF) {
-		prvFChar = curFChar;
-		curFChar = infile.get();
-		switch(curFChar) {
+		inchar = infile.get();
+		if (commentDepth) {
+			switch(inchar) {
+				case '(': commentDepth++; break;
+				case ')': commentDepth--; break;
+			}
+			continue;
+		}
+		switch(inchar) {
 			case '\n': curLine++; // fall
 			case '\t': // fall
-			case ' ' : // fall
-				switch (prvFChar) {
-					case '\n': break;
-					case '\t': break;
-					case ' ' : break;
-					default:
-						handleToken(token);
-						token.clear();
-				}
+			case ' ' :
+				handleToken(token);
+				break;
+			case '(' :
+				handleToken(token);
+				commentDepth = 1;
 				break;
 			default:
-				token.push_back(curFChar);
+				token.push_back(inchar);
 		}
 	}
-	
+	if (commentDepth) std::cout << "Warning: unclosed comment\n";
 	infile.close();
+	
 	return 0;
 }

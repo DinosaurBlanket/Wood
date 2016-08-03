@@ -1,6 +1,6 @@
-.hyaku
+.hyaku         (comment (comment inside) outside)
   +
-    - 20 10
+    - 20 10    (10)
     /
-      * 9 100
+      * 9()100(900)
       10
