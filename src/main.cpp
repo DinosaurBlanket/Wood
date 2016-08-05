@@ -1,6 +1,38 @@
-#include <fstream>
+#include <vector>
 #include <string>
+#include <fstream>
 #include <iostream>
+
+const char numType = '.';
+const char narType = ':';
+const char parType = '|';
+const char anyType = '&';
+
+
+union cscdTypeBox  {
+	double               num;
+	std::vector<float>   narray;
+	std::vector<uint8_t> parray;
+};
+
+
+struct astNodeDef {
+	std::string  name;  // includes parameters, doesn't include "fn "
+	void        *fn;    // will hold function pointers of many types, or NULL
+	cscdTypeBox  value; // for nodes that output constant, used when fn == NULL
+};
+
+struct astNode {
+	std::string          name; // same as astNodeDef
+	std::vector<astNode> kids;
+};
+
+struct astRoot {
+	std::string name;
+	astNode     init;
+	astNode     reev;
+};
+
 
 void handleToken(std::string &t) {
 	if (!t.length()) return;
