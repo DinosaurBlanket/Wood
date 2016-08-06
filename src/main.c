@@ -7,7 +7,7 @@ const char narType = ':';
 const char parType = '|';
 const char anyType = '&';
 
-GenBuf(charBuf, char, init_charBuf, push_charBuf, pop_charBuf, trim_charBuf, clear_charBuf)
+bufType(char, charBuf)
 
 typedef union {
 	double num;
