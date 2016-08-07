@@ -1,4 +1,4 @@
-flags = "-Wall -g -std=c11"
+flags = "-Wall -g -std=c11 -Wno-missing-braces"
 env = Environment(CC = "gcc", CCFLAGS = flags)
 src = ["main.c"]
 env.Program("cscd", src, LIBS = [])
