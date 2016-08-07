@@ -36,6 +36,9 @@ void clear_ ## type (structName *b) {\
   memset(b->data, 0, b->count * sizeof(type));\
   b->count = 0;\
 }\
-type last_ ## type (structName *b) {\
-  return b->data[b->count - 1];\
+type last_ ## type (structName b) {\
+  return b.data[b.count - 1];\
+}\
+type *plast_ ## type (structName b) {\
+  return &b.data[b.count - 1];\
 }

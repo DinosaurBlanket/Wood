@@ -61,9 +61,21 @@ typedef enum {
 	ttr_parLit
 } thingsToRead;
 
-void handleToken(char *token) {
-	puts("yo");
+void printUpTo(char *toPrint, char upTo) {
+	for (
+		uint32_t i = 0;
+		toPrint[i] && toPrint[i] != upTo;
+		i++
+	) {
+		putc(toPrint[i], stdout);
+	}
 }
+void handleToken(char *token) {
+	printUpTo(token, '\n');
+	puts("\n-----");
+}
+
+#define SpaceCase case '\n': case '\t': case ' '
 
 int main(int argc, char** argv ) {
 	if (argc < 2) {
@@ -82,8 +94,8 @@ int main(int argc, char** argv ) {
 	//astRootBuf roots        = init_astRoot(1);
 	//astNodeBuf curRootExpr  = init_astNode(1);
 	charBuf    tokens       = init_char(128);
-	push_char(&tokens, ' '); // to look back on without going OOB
-	char      *curToken     = NULL;
+	push_char(&tokens, '\n'); // to look back on without going OOB
+	char *tokenStart = tokens.data + 1;
 	
 	for (
 		char inchar = fgetc(infile);
@@ -100,26 +112,17 @@ int main(int argc, char** argv ) {
 		}
 		switch (inchar) {
 			case cmntStartChar: commentDepth++; // fall
-			case '\n': // fall
-			case '\t': // fall
-			case ' ' :
-				switch (last_char(&tokens)) {
-					case '\n': // fall
-					case '\t': // fall
-					case ' ' :
-						continue;
-				}
-				handleToken(curToken);
+			SpaceCase:
+				switch (last_char(tokens)) {SpaceCase: continue;}
 				push_char(&tokens, '\n');
+				handleToken(tokenStart);
+				tokenStart = &tokens.data[tokens.count];
 				continue;
 		}
 		push_char(&tokens, inchar);
-		curToken = &tokens.data[tokens.count];
 	}
 	if (commentDepth) puts("Warning: unclosed comment\n");
 	fclose(infile);
-	
-	puts(tokens.data);
 	
 	return 0;
 }
