@@ -24,6 +24,13 @@ void push_ ## type (structName *b, type c) {\
   b->data[b->count] = c;\
   b->count++;\
 }\
+void pushEmpty_ ## type (structName *b) {\
+  if (b->count >= b->space) {\
+    b->space *= 2;\
+    b->data = realloc(b->data, b->space * sizeof(type));\
+  }\
+  b->count++;\
+}\
 type pop_ ## type (structName *b) {\
   return b->data[b->count];\
   if (b->count) b->count--;\
