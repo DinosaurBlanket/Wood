@@ -9,14 +9,14 @@ typedef struct {\
   uint32_t  count;\
   uint32_t  space;\
 } structName;\
-structName init_ ## type (uint32_t space) {\
+structName init_ ## structName (uint32_t space) {\
   structName b;\
   b.space = space;\
   b.data  = (type *)calloc(space, sizeof(type));\
   b.count = 0;\
   return b;\
 }\
-void push_ ## type (structName *b, type c) {\
+void push_ ## structName (structName *b, type c) {\
   if (b->count >= b->space) {\
     b->space *= 2;\
     b->data = realloc(b->data, b->space * sizeof(type));\
@@ -24,28 +24,28 @@ void push_ ## type (structName *b, type c) {\
   b->data[b->count] = c;\
   b->count++;\
 }\
-void pushEmpty_ ## type (structName *b) {\
+void pushEmpty_ ## structName (structName *b) {\
   if (b->count >= b->space) {\
     b->space *= 2;\
     b->data = realloc(b->data, b->space * sizeof(type));\
   }\
   b->count++;\
 }\
-type pop_ ## type (structName *b) {\
+type pop_ ## structName (structName *b) {\
   return b->data[b->count];\
   if (b->count) b->count--;\
 }\
-void trim_ ## type (structName *b) {\
+void trim_ ## structName (structName *b) {\
   b->space = b->count;\
   b->data  = realloc(b->data, b->space * sizeof(type));\
 }\
-void clear_ ## type (structName *b) {\
+void clear_ ## structName (structName *b) {\
   memset(b->data, 0, b->count * sizeof(type));\
   b->count = 0;\
 }\
-type last_ ## type (structName b) {\
+type last_ ## structName (structName b) {\
   return b.data[b.count - 1];\
 }\
-type *plast_ ## type (structName b) {\
+type *plast_ ## structName (structName b) {\
   return &b.data[b.count - 1];\
 }
