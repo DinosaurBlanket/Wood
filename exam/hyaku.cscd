@@ -1,6 +1,6 @@
-.hyaku       (comment (comment inside) outside)
-  +
-    - 20 10
+.hyaku        (root)
+  +           (trunk)
+    - 20 10   (branches...)
     /
-      * 9 100
+      * nine 100
       10
