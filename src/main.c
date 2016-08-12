@@ -128,7 +128,8 @@ thingsToRead nodeFromToken(char *token) {
 		lastNode->def.paramCount = 0;
 		lastNode->def.fn         = sl_numLit;
 		lastNode->kidCount       = 0;
-		lastNode->litVal.num     = 0;
+		lastNode->litVal.num     = atof(token);
+		printf("numLit: %f\n", lastNode->litVal.num);
 		return ttr_branch;
 	}
 	fr (i, cscdStdLibCount) {
