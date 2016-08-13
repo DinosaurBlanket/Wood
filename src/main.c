@@ -12,7 +12,7 @@
 #define tokSep    '\n' // token separator
 #define tokSepStr "\n"
 
-#define _ShouldNotBeHere_ printf("Should Not Be Here: line %i of %s\n", __LINE__, __FILE__);
+#define _ShouldNotBeHere_ printf("Should Not Be Here: line %i of %s\n", __LINE__, __FILE__)
 #define fr(i, bound) for (int i = 0; i < (bound); i++)
 
 void printUpTo(const char *toPrint, char upTo) {
@@ -81,15 +81,9 @@ const astNodeDef cscdStdLib[cscdStdLibCount] = {
 typedef struct {
 	astNodeDef  def;
 	uint32_t    kidCount; // incremented as parameters are filled
+	uint32_t    line;     // in source file
 	anyBox      litVal;
 } astNode;
-
-// typedef struct {
-// 	char    *name;
-// 	uint8_t  type;
-// 	astNode *init;
-// 	astNode *reev;
-// } astRoot;
 
 
 #define SpaceCase case '\n': case '\t': case ' '
@@ -114,9 +108,8 @@ typedef enum {
 	ttr_error
 } thingsToRead;
 
-thingsToRead nodeFromToken(char *token) {
-	printUpTo(token, tokSep);
-	printf("  (in nodeFromToken)\n");
+thingsToRead nodeFromToken(char *token, uint32_t line) {
+	printf("nodeFromToken: "); printUpTo(token, tokSep); puts("");
 	pushEmpty_astNodeBuf(&astNodes);
 	astNode *lastNode = plast_astNodeBuf(astNodes);
 	if (
@@ -128,8 +121,9 @@ thingsToRead nodeFromToken(char *token) {
 		lastNode->def.paramCount = 0;
 		lastNode->def.fn         = sl_numLit;
 		lastNode->kidCount       = 0;
+		lastNode->line           = line;
 		lastNode->litVal.num     = atof(token);
-		printf("numLit: %f\n", lastNode->litVal.num);
+		//printf("numLit: %f\n", lastNode->litVal.num);
 		return ttr_branch;
 	}
 	fr (i, cscdStdLibCount) {
@@ -138,6 +132,7 @@ thingsToRead nodeFromToken(char *token) {
 			//match
 			lastNode->def        = cscdStdLib[i];
 			lastNode->kidCount   = 0;
+			lastNode->line       = line;
 			lastNode->litVal.num = 0;
 			return ttr_branch;
 		}
@@ -146,9 +141,8 @@ thingsToRead nodeFromToken(char *token) {
 	_ShouldNotBeHere_;
 	return ttr_error;
 }
-thingsToRead newFromToken(char *token) {
-	printUpTo(token, tokSep);
-	printf("  (in newFromToken)\n");
+thingsToRead newFromToken(char *token, uint32_t line) {
+	printf(" newFromToken: "); printUpTo(token, tokSep); puts("");
 	astNode *lastNode;
 	switch (*token) {
 		typeCharCase:
@@ -158,6 +152,7 @@ thingsToRead newFromToken(char *token) {
 			lastNode->def.paramCount = 1;
 			lastNode->def.fn         = sl_root;
 			lastNode->kidCount       = 0;
+			lastNode->line           = line;
 			lastNode->litVal.num     = 0;
 			return ttr_branch;
 		default: _ShouldNotBeHere_;
@@ -165,11 +160,11 @@ thingsToRead newFromToken(char *token) {
 	return ttr_error;
 }
 
-void handleToken(char *token) {
+void handleToken(char *token, uint32_t line) {
 	static thingsToRead reading = ttr_new;
 	switch (reading) {
-		case ttr_new:    reading = newFromToken(token); break;
-		case ttr_branch: reading = nodeFromToken(token); break;
+		case ttr_new:    reading =  newFromToken(token, line); break;
+		case ttr_branch: reading = nodeFromToken(token, line); break;
 		default: _ShouldNotBeHere_;
 	}
 }
@@ -186,7 +181,7 @@ int main(int argc, char** argv ) {
 		printf("could not open '%s'\n", fileName);
 		return 2;
 	}
-	uint32_t curLine      = 0;
+	uint32_t curLine      = 1;
 	uint32_t commentDepth = 0;
 	astNodes       = init_astNodeBuf(32);
 	astTypes       = init_charBuf(32);
@@ -211,13 +206,18 @@ int main(int argc, char** argv ) {
 			SpaceCase:
 				switch (last_charBuf(tokens)) {SpaceCase: continue;}
 				push_charBuf(&tokens, tokSep);
-				handleToken(tokenStart);
+				handleToken(tokenStart, inchar == '\n' ? curLine-1 : curLine);
 				tokenStart = &tokens.data[tokens.count];
 				continue;
 		}
 		push_charBuf(&tokens, inchar);
 	}
 	if (commentDepth) puts("Warning: unclosed comment\n");
+	fr (i, astNodes.count) {
+		printf("%3i: ", astNodes.data[i].line);
+		printUpTo(astNodes.data[i].def.name, tokSep);
+		puts("");
+	}
 	fclose(infile);
 	free(astNodes.data);
 	free(astTypes.data);
