@@ -25,11 +25,18 @@ void push_ ## structName (structName *b, type c) {\
   b->count++;\
 }\
 void pushEmpty_ ## structName (structName *b) {\
-  if (b->count >= b->space) {\
+  b->count++;\
+  if (b->count > b->space) {\
     b->space *= 2;\
     b->data = realloc(b->data, b->space * sizeof(type));\
   }\
-  b->count++;\
+}\
+void pushNEmpty_ ## structName (structName *b, uint32_t n) {\
+  b->count += n;\
+  if (b->count > b->space) {\
+    while (b->count > b->space) b->space *= 2;\
+    b->data = realloc(b->data, b->space * sizeof(type));\
+  }\
 }\
 type pop_ ## structName (structName *b) {\
   return b->data[b->count];\

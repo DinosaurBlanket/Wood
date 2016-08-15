@@ -57,7 +57,7 @@ typedef union {
 
 typedef struct {
 	char     *name;  // includes parameters, doesn't include type chars or "fn "
-	uint32_t  paramCount;
+	uint32_t  arity;
 	void     *fn;    // will hold function pointers of many types
 } astNodeDef;
 
@@ -71,18 +71,19 @@ void   sl_numLit(void) {};
 
 #define cscdStdLibCount 5
 const astNodeDef cscdStdLib[cscdStdLibCount] = {
-	{.name = ".+" tokSepStr ".a" tokSepStr ".b", .paramCount = 2, .fn = sl_add},
-	{.name = ".-" tokSepStr ".a" tokSepStr ".b", .paramCount = 2, .fn = sl_sub},
-	{.name = ".*" tokSepStr ".a" tokSepStr ".b", .paramCount = 2, .fn = sl_mul},
-	{.name = "./" tokSepStr ".a" tokSepStr ".b", .paramCount = 2, .fn = sl_div},
-	{.name = ".nine",                            .paramCount = 0, .fn = sl_nine}
+	{.name = ".+" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_add},
+	{.name = ".-" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_sub},
+	{.name = ".*" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_mul},
+	{.name = "./" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_div},
+	{.name = ".nine",                            .arity = 0, .fn = sl_nine}
 };
 
 typedef struct {
-	astNodeDef  def;
-	uint32_t    kidCount; // incremented as parameters are filled
-	uint32_t    line;     // in source file
-	anyBox      litVal;
+	astNodeDef def;
+	uint32_t   line;     // in source file
+	uint32_t   kidsIndx; // in astKids array
+	uint32_t   kidCount; // incremented as arguments are added
+	anyBox     litVal;
 } astNode;
 
 
@@ -93,11 +94,12 @@ case narType:\
 case parType:\
 case thruType
 
-BufType(char,    charBuf);
-BufType(astNode, astNodeBuf);
+BufType(char,     charBuf);
+BufType(astNode,  astNodeBuf);
+BufType(astNode*, astNodePBuf);
 
-astNodeBuf astNodes;
-charBuf    astTypes;
+astNodeBuf   astNodes;
+astNodePBuf  astKids;
 
 typedef enum {
 	ttr_new,
@@ -108,62 +110,98 @@ typedef enum {
 	ttr_error
 } thingsToRead;
 
+thingsToRead deorphan(astNode *const orphan) {
+	for (astNode *p = orphan-1; p >= astNodes.data; p--) {
+		if (p->def.fn == sl_root && p->kidCount) {
+			printf("ERROR in line %i:\n\t'", orphan->line);
+			printUpTo(orphan->def.name, tokSep);
+			printf("' has no parent.\n");
+			return ttr_error;
+		}
+		if (p->kidCount < p->def.arity) {
+			astKids.data[p->kidsIndx + p->kidCount] = orphan;
+			p->kidCount++;
+			return ttr_branch;
+		}
+	}
+	_ShouldNotBeHere_;
+	return ttr_error;
+}
+
 thingsToRead nodeFromToken(char *token, uint32_t line) {
 	printf("nodeFromToken: "); printUpTo(token, tokSep); puts("");
 	pushEmpty_astNodeBuf(&astNodes);
-	astNode *lastNode = plast_astNodeBuf(astNodes);
+	astNode *const lastNode = plast_astNodeBuf(astNodes);
+	// numlit
 	if (
 		('0' <= *token && *token <= '9')  ||  
 		(*token == '-' && '0' <= token[1] && token[1] <= '9')
 	) {
-		// numlit
-		lastNode->def.name       = token;
-		lastNode->def.paramCount = 0;
-		lastNode->def.fn         = sl_numLit;
-		lastNode->kidCount       = 0;
-		lastNode->line           = line;
-		lastNode->litVal.num     = atof(token);
+		lastNode->def.name   = token;
+		lastNode->def.arity  = 0;
+		lastNode->def.fn     = sl_numLit;
+		lastNode->kidsIndx   = UINT32_MAX;
+		lastNode->kidCount   = 0;
+		lastNode->line       = line;
+		lastNode->litVal.num = atof(token);
 		//printf("numLit: %f\n", lastNode->litVal.num);
-		return ttr_branch;
+		return deorphan(lastNode);
 	}
+	// stdlib
 	fr (i, cscdStdLibCount) {
-
 		if (matchUpTo(tokenPastType(&cscdStdLib[i].name[0]), token, tokSep)) {
-			//match
 			lastNode->def        = cscdStdLib[i];
-			lastNode->kidCount   = 0;
 			lastNode->line       = line;
+			lastNode->kidCount   = 0;
 			lastNode->litVal.num = 0;
-			return ttr_branch;
+			const uint32_t arity = lastNode->def.arity; 
+			if (arity) {
+				pushNEmpty_astNodePBuf(&astKids, arity);
+				lastNode->kidsIndx = astKids.count - arity; 
+			}
+			return deorphan(lastNode);
 		}
 	}
 	// not found
 	_ShouldNotBeHere_;
 	return ttr_error;
 }
-thingsToRead newFromToken(char *token, uint32_t line) {
-	printf(" newFromToken: "); printUpTo(token, tokSep); puts("");
-	astNode *lastNode;
-	switch (*token) {
-		typeCharCase:
-			pushEmpty_astNodeBuf(&astNodes);
-			lastNode = plast_astNodeBuf(astNodes);
-			lastNode->def.name       = token;
-			lastNode->def.paramCount = 1;
-			lastNode->def.fn         = sl_root;
-			lastNode->kidCount       = 0;
-			lastNode->line           = line;
-			lastNode->litVal.num     = 0;
-			return ttr_branch;
-		default: _ShouldNotBeHere_;
+thingsToRead rootFromToken(char *token, uint32_t line) {
+	printf("rootFromToken: "); printUpTo(token, tokSep); puts("");
+	pushEmpty_astNodeBuf(&astNodes);
+	astNode *const lastNode = plast_astNodeBuf(astNodes);
+	lastNode->def.name   = token;
+	lastNode->def.arity  = 1;
+	lastNode->def.fn     = sl_root;
+	lastNode->line       = line;
+	lastNode->kidCount   = 0;
+	lastNode->litVal.num = 0;
+	for (astNode *n = lastNode; n->def.fn != sl_root; n--) {
+		if (n < astNodes.data) {
+			_ShouldNotBeHere_;
+			return ttr_error;
+		}
+		if (n->kidCount < n->def.arity) {
+			printf("ERROR in line %i:\n\t''", line);
+			printUpTo(n->def.name, tokSep);
+			printf("' has too few arguments.\n");
+			return ttr_error;
+		}
 	}
-	return ttr_error;
+	pushEmpty_astNodePBuf(&astKids);
+	lastNode->kidsIndx = astKids.count-1; 
+	return ttr_branch;
 }
 
 void handleToken(char *token, uint32_t line) {
 	static thingsToRead reading = ttr_new;
 	switch (reading) {
-		case ttr_new:    reading =  newFromToken(token, line); break;
+		case ttr_new:
+			switch (*token) {
+				typeCharCase: reading = rootFromToken(token, line); break;
+				default: _ShouldNotBeHere_;
+			}
+			break;
 		case ttr_branch: reading = nodeFromToken(token, line); break;
 		default: _ShouldNotBeHere_;
 	}
@@ -184,7 +222,7 @@ int main(int argc, char** argv ) {
 	uint32_t curLine      = 1;
 	uint32_t commentDepth = 0;
 	astNodes       = init_astNodeBuf(32);
-	astTypes       = init_charBuf(32);
+	astKids        = init_astNodePBuf(32);
 	charBuf tokens = init_charBuf(256);
 	push_charBuf(&tokens, tokSep); // to look back on without going OOB
 	char *tokenStart = tokens.data + 1;
@@ -220,7 +258,7 @@ int main(int argc, char** argv ) {
 	}
 	fclose(infile);
 	free(astNodes.data);
-	free(astTypes.data);
+	free(astKids.data);
 	free(tokens.data);
 	return 0;
 }
