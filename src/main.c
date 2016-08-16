@@ -39,6 +39,7 @@ char *tokenPastType(char *token) {
 	}
 	return token;
 }
+void printErrorHead(uint32_t line) {printf("ERROR in line %i:\n\t", line);}
 
 
 typedef enum {
@@ -105,8 +106,8 @@ astNodePBuf  astKids;
 void deorphan(astNode *const orphan) {
 	for (astNode *p = orphan-1; p >= astNodes.data; p--) {
 		if (p->def.fn == sl_root && p->kidCount) {
-			printf("ERROR in line %i:\n\t'", orphan->line);
-			printUpTo(orphan->def.name, tokSep);
+			printErrorHead(orphan->line);
+			printf("'"); printUpTo(orphan->def.name, tokSep);
 			printf("' has no parent.\n");
 			return;
 		}
@@ -155,8 +156,11 @@ void nodeFromToken(char *token, uint32_t line) {
 			return;
 		}
 	}
+	// 
 	// not found
-	_ShouldNotBeHere_;
+	printErrorHead(line);
+	printf("'"); printUpTo(token, tokSep);
+	printf("' was not recognized.\n");
 }
 void rootFromToken(char *token, uint32_t line) {
 	printf("rootFromToken: "); printUpTo(token, tokSep); puts("");
@@ -174,8 +178,8 @@ void rootFromToken(char *token, uint32_t line) {
 			return;
 		}
 		if (n->kidCount < n->def.arity) {
-			printf("ERROR in line %i:\n\t''", line);
-			printUpTo(n->def.name, tokSep);
+			printErrorHead(line);
+			printf("'"); printUpTo(n->def.name, tokSep);
 			printf("' has too few arguments.\n");
 			return;
 		}
