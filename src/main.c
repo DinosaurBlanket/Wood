@@ -101,34 +101,25 @@ BufType(astNode*, astNodePBuf);
 astNodeBuf   astNodes;
 astNodePBuf  astKids;
 
-typedef enum {
-	ttr_new,
-	ttr_branch,
-	ttr_fnParams,
-	ttr_narLit,
-	ttr_parLit,
-	ttr_error
-} thingsToRead;
 
-thingsToRead deorphan(astNode *const orphan) {
+void deorphan(astNode *const orphan) {
 	for (astNode *p = orphan-1; p >= astNodes.data; p--) {
 		if (p->def.fn == sl_root && p->kidCount) {
 			printf("ERROR in line %i:\n\t'", orphan->line);
 			printUpTo(orphan->def.name, tokSep);
 			printf("' has no parent.\n");
-			return ttr_error;
+			return;
 		}
 		if (p->kidCount < p->def.arity) {
 			astKids.data[p->kidsIndx + p->kidCount] = orphan;
 			p->kidCount++;
-			return ttr_branch;
+			return;
 		}
 	}
 	_ShouldNotBeHere_;
-	return ttr_error;
 }
 
-thingsToRead nodeFromToken(char *token, uint32_t line) {
+void nodeFromToken(char *token, uint32_t line) {
 	printf("nodeFromToken: "); printUpTo(token, tokSep); puts("");
 	pushEmpty_astNodeBuf(&astNodes);
 	astNode *const lastNode = plast_astNodeBuf(astNodes);
@@ -145,7 +136,8 @@ thingsToRead nodeFromToken(char *token, uint32_t line) {
 		lastNode->line       = line;
 		lastNode->litVal.num = atof(token);
 		//printf("numLit: %f\n", lastNode->litVal.num);
-		return deorphan(lastNode);
+		deorphan(lastNode);
+		return;
 	}
 	// stdlib
 	fr (i, cscdStdLibCount) {
@@ -159,14 +151,14 @@ thingsToRead nodeFromToken(char *token, uint32_t line) {
 				pushNEmpty_astNodePBuf(&astKids, arity);
 				lastNode->kidsIndx = astKids.count - arity; 
 			}
-			return deorphan(lastNode);
+			deorphan(lastNode);
+			return;
 		}
 	}
 	// not found
 	_ShouldNotBeHere_;
-	return ttr_error;
 }
-thingsToRead rootFromToken(char *token, uint32_t line) {
+void rootFromToken(char *token, uint32_t line) {
 	printf("rootFromToken: "); printUpTo(token, tokSep); puts("");
 	pushEmpty_astNodeBuf(&astNodes);
 	astNode *const lastNode = plast_astNodeBuf(astNodes);
@@ -179,32 +171,25 @@ thingsToRead rootFromToken(char *token, uint32_t line) {
 	for (astNode *n = lastNode; n->def.fn != sl_root; n--) {
 		if (n < astNodes.data) {
 			_ShouldNotBeHere_;
-			return ttr_error;
+			return;
 		}
 		if (n->kidCount < n->def.arity) {
 			printf("ERROR in line %i:\n\t''", line);
 			printUpTo(n->def.name, tokSep);
 			printf("' has too few arguments.\n");
-			return ttr_error;
+			return;
 		}
 	}
 	pushEmpty_astNodePBuf(&astKids);
 	lastNode->kidsIndx = astKids.count-1; 
-	return ttr_branch;
 }
 
 void handleToken(char *token, uint32_t line) {
-	static thingsToRead reading = ttr_new;
-	switch (reading) {
-		case ttr_new:
-			switch (*token) {
-				typeCharCase: reading = rootFromToken(token, line); break;
-				default: _ShouldNotBeHere_;
-			}
-			break;
-		case ttr_branch: reading = nodeFromToken(token, line); break;
-		default: _ShouldNotBeHere_;
+	switch (*token) {typeCharCase:
+		rootFromToken(token, line);
+		return;
 	}
+	nodeFromToken(token, line);
 }
 
 
