@@ -67,7 +67,8 @@ double sl_sub(double a, double b) {return a - b;}
 double sl_mul(double a, double b) {return a * b;}
 double sl_div(double a, double b) {return a / b;}
 double sl_nine(void) {return 9;}
-void   sl_root(void) {};
+void   sl_rootDef(void) {};
+void   sl_rootRef(void) {};
 void   sl_numLit(void) {};
 
 #define cscdStdLibCount 5
@@ -105,7 +106,7 @@ astNodePBuf  astKids;
 
 void deorphan(astNode *const orphan) {
 	for (astNode *p = orphan-1; p >= astNodes.data; p--) {
-		if (p->def.fn == sl_root && p->kidCount) {
+		if (p->def.fn == sl_rootDef && p->kidCount) {
 			printErrorHead(orphan->line);
 			printf("'"); printUpTo(orphan->def.name, tokSep);
 			printf("' has no parent.\n");
@@ -156,7 +157,23 @@ void nodeFromToken(char *token, uint32_t line) {
 			return;
 		}
 	}
-	// 
+	// local
+	fr (i, astNodes.count) {
+		if (
+			astNodes.data[i].def.fn == sl_rootDef  && 
+			matchUpTo(tokenPastType(astNodes.data[i].def.name), token, tokSep)
+		) {
+			lastNode->def.name   = astNodes.data[i].def.name;
+			lastNode->def.arity  = 0;
+			lastNode->def.fn     = sl_rootRef;
+			lastNode->line       = line;
+			lastNode->kidsIndx   = UINT32_MAX;
+			lastNode->kidCount   = 0;
+			lastNode->litVal.num = 0;
+			deorphan(lastNode);
+			return;
+		}
+	}
 	// not found
 	printErrorHead(line);
 	printf("'"); printUpTo(token, tokSep);
@@ -168,11 +185,11 @@ void rootFromToken(char *token, uint32_t line) {
 	astNode *const lastNode = plast_astNodeBuf(astNodes);
 	lastNode->def.name   = token;
 	lastNode->def.arity  = 1;
-	lastNode->def.fn     = sl_root;
+	lastNode->def.fn     = sl_rootDef;
 	lastNode->line       = line;
 	lastNode->kidCount   = 0;
 	lastNode->litVal.num = 0;
-	for (astNode *n = lastNode; n->def.fn != sl_root; n--) {
+	for (astNode *n = lastNode; n->def.fn != sl_rootDef; n--) {
 		if (n < astNodes.data) {
 			_ShouldNotBeHere_;
 			return;
