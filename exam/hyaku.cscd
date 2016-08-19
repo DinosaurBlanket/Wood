@@ -1,7 +1,12 @@
-.hyaku        (root)
+f32: hyaku        (root)
   +           (branches...)
     - 20 10
     /
       * nine 100
       10
-.sen  * hyaku 10
+f32: sen  * hyaku 10
+text concat4
+  "hyaku : "
+  numToString hyaku ^|0
+  "\nsen   : "
+  numToString sen   ^|0

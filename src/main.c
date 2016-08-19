@@ -159,6 +159,7 @@ void nodeFromToken(char *token, uint32_t line) {
 	}
 	// local
 	fr (i, astNodes.count) {
+		// root
 		if (
 			astNodes.data[i].def.fn == sl_rootDef  && 
 			matchUpTo(tokenPastType(astNodes.data[i].def.name), token, tokSep)
