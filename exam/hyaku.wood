@@ -1,12 +1,14 @@
-f32: hyaku        (root)
+:num hyaku    (root)
   +           (branches...)
     - 20 10
     /
       * nine 100
       10
-f32: sen  * hyaku 10
+:num sen  * hyaku 10
+(
 text concat4
   "hyaku : "
-  numToString hyaku ^|0
+  numToString hyaku seed0
   "\nsen   : "
-  numToString sen   ^|0
+  numToString sen   seed0
+)

@@ -3,14 +3,13 @@
 #include <stdbool.h>
 #include "buf.h"
 
-#define numType  '.'
-#define narType  ':'
-#define parType  '|'
-#define thruType '~'
+#define singlTypeChar ':'
+#define arrayTypeChar '|'
+#define doubleBufChar '\\'
 #define cmntStart '('
 #define cmntEnd   ')'
 #define tokSep    '\n' // token separator
-#define tokSepStr "\n"
+//#define tokSepStr "\n"
 
 #define _ShouldNotBeHere_ printf("Should Not Be Here: line %i of %s\n", __LINE__, __FILE__)
 #define fr(i, bound) for (int i = 0; i < (bound); i++)
@@ -30,78 +29,42 @@ bool matchUpTo(const char *l, const char *r, char upTo) {
 	if ((!l[i] || l[i] == upTo) && (!r[i] || r[i] == upTo)) return true;
 	return false;
 }
-char *tokenPastType(char *token) {
-	switch (*token) {
-		case numType : // fall
-		case thruType: return token+1;
-		case narType : return token[1] == narType ? token+2 : token+1;
-		case parType : return token[1] == parType ? token+2 : token+1;
-	}
-	return token;
-}
 void printErrorHead(uint32_t line) {printf("ERROR in line %i:\n\t", line);}
 
-
-typedef enum {
-	ct_num,  // number
-	ct_nar,  // number array
-	ct_par,  // packed array
-	ct_dnar, // number array, double-buffered
-	ct_dpar, // packed array, double-buffered
-	ct_any
-} cscdType;
 
 typedef union {
 	double num;
 	double _unusedfornow[4];
-} anyBox;
+} typeBox;
 
 typedef struct {
-	char     *name;  // includes parameters, doesn't include type chars or "fn "
-	uint32_t  arity;
-	void     *fn;    // will hold function pointers of many types
 } astNodeDef;
 
-double sl_add(double a, double b) {return a + b;}
-double sl_sub(double a, double b) {return a - b;}
-double sl_mul(double a, double b) {return a * b;}
-double sl_div(double a, double b) {return a / b;}
-double sl_nine(void) {return 9;}
-void   sl_rootDef(void) {};
-void   sl_rootRef(void) {};
-void   sl_numLit(void) {};
-
-#define cscdStdLibCount 5
-const astNodeDef cscdStdLib[cscdStdLibCount] = {
-	{.name = ".+" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_add},
-	{.name = ".-" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_sub},
-	{.name = ".*" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_mul},
-	{.name = "./" tokSepStr ".a" tokSepStr ".b", .arity = 2, .fn = sl_div},
-	{.name = ".nine",                            .arity = 0, .fn = sl_nine}
+#define builtInsCount 2
+const astNodeDef builtIns[builtInsCount] = {
+	{},
+	{}
 };
 
 typedef struct {
-	astNodeDef def;
-	uint32_t   line;     // in source file
-	uint32_t   kidsIndx; // in astKids array
-	uint32_t   kidCount; // incremented as arguments are added
-	anyBox     litVal;
 } astNode;
 
-
 #define SpaceCase case '\n': case '\t': case ' '
-#define typeCharCase \
-case numType:\
-case narType:\
-case parType:\
-case thruType
+#define typeCharCase case singlTypeChar: case arrayTypeChar: case doubleBufChar
+
 
 BufType(char,     charBuf);
 BufType(astNode,  astNodeBuf);
-BufType(astNode*, astNodePBuf);
 
 astNodeBuf   astNodes;
-astNodePBuf  astKids;
+
+
+
+
+
+
+
+
 
 
 void deorphan(astNode *const orphan) {
@@ -127,7 +90,7 @@ void nodeFromToken(char *token, uint32_t line) {
 	astNode *const lastNode = plast_astNodeBuf(astNodes);
 	// numlit
 	if (
-		('0' <= *token && *token <= '9')  ||  
+		('0' <= *token && *token <= '9')  ||
 		(*token == '-' && '0' <= token[1] && token[1] <= '9')
 	) {
 		lastNode->def.name   = token;
@@ -142,16 +105,16 @@ void nodeFromToken(char *token, uint32_t line) {
 		return;
 	}
 	// stdlib
-	fr (i, cscdStdLibCount) {
-		if (matchUpTo(tokenPastType(&cscdStdLib[i].name[0]), token, tokSep)) {
-			lastNode->def        = cscdStdLib[i];
+	fr (i, woodStdLibCount) {
+		if (matchUpTo(tokenPastType(&woodStdLib[i].name[0]), token, tokSep)) {
+			lastNode->def        = woodStdLib[i];
 			lastNode->line       = line;
 			lastNode->kidCount   = 0;
 			lastNode->litVal.num = 0;
-			const uint32_t arity = lastNode->def.arity; 
+			const uint32_t arity = lastNode->def.arity;
 			if (arity) {
 				pushNEmpty_astNodePBuf(&astKids, arity);
-				lastNode->kidsIndx = astKids.count - arity; 
+				lastNode->kidsIndx = astKids.count - arity;
 			}
 			deorphan(lastNode);
 			return;
@@ -161,7 +124,7 @@ void nodeFromToken(char *token, uint32_t line) {
 	fr (i, astNodes.count) {
 		// root
 		if (
-			astNodes.data[i].def.fn == sl_rootDef  && 
+			astNodes.data[i].def.fn == sl_rootDef  &&
 			matchUpTo(tokenPastType(astNodes.data[i].def.name), token, tokSep)
 		) {
 			lastNode->def.name   = astNodes.data[i].def.name;
@@ -203,7 +166,7 @@ void rootFromToken(char *token, uint32_t line) {
 		}
 	}
 	pushEmpty_astNodePBuf(&astKids);
-	lastNode->kidsIndx = astKids.count-1; 
+	lastNode->kidsIndx = astKids.count-1;
 }
 
 void handleToken(char *token, uint32_t line) {
@@ -215,9 +178,9 @@ void handleToken(char *token, uint32_t line) {
 }
 
 
-int main(int argc, char** argv ) {
+int main(int argc, char **argv) {
 	if (argc < 2) {
-		puts("usage:\ncscd HelloWorld.cscd\n");
+		puts("usage:\nwood HelloWorld.wood\n");
 		return 1;
 	}
   char *fileName = argv[1];
