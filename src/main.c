@@ -37,16 +37,55 @@ typedef union {
 	double _unusedfornow[4];
 } typeBox;
 
-typedef struct {
-} astNodeDef;
-
-#define builtInsCount 2
-const astNodeDef builtIns[builtInsCount] = {
-	{},
-	{}
+enum astNodeIds {
+  // don't return anything
+    // not outputs
+      ani_structDef,
+      ani_fnDef,
+      ani_root,
+      ani_atfile,
+    // outputs
+      ani_text,
+      ani_video,
+      ani_audio,
+      ani_baxit,
+      ani_proque,
+      ani_prospawn,
+  // return something
+    ani_builtinCall,
+    ani_fnCall,
+    ani_paramCall,
+    ani_graft,
+    ani_graftCall,
+    ani_structFunnel,
+    ani_rootCall,
+    ani_numLit,
+    ani_strLit,
+    ani_arrLitBeg,
+    ani_arrLitEnd
 };
 
 typedef struct {
+	char *name;         // includes types
+  int   kidsRequired; // number of nodes that should link to this as "parent"
+} astNodeDef;
+
+#define builtinsCount 5
+const astNodeDef builtins[builtinsCount] = {
+	{.name=":num + :num l :num r", .kidsRequired=2},
+	{.name=":num - :num l :num r", .kidsRequired=2},
+	{.name=":num * :num l :num r", .kidsRequired=2},
+	{.name=":num / :num l :num r", .kidsRequired=2},
+	{.name=":num nine",            .kidsRequired=0}
+};
+
+typedef struct {
+  astNodeDef      def;
+	int             id;
+  int             kidCount;  // incremented until it matches parent's kidsRequired
+	struct astNode *parent;
+  struct astNode *idSource;  // source of what's being called (fnDef, root, structDef, multiplexer)
+  int             idSourceRelation; // index of thing relative to source (nth param, struct member, multiplexer ctx)
 } astNode;
 
 #define SpaceCase case '\n': case '\t': case ' '
