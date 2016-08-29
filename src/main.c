@@ -8,8 +8,7 @@
 #define doubleBufChar '\\'
 #define cmntStart '('
 #define cmntEnd   ')'
-#define tokSep    '\n' // token separator
-//#define tokSepStr "\n"
+#define tokSep    ' ' // token separator
 
 #define _ShouldNotBeHere_ printf("Should Not Be Here: line %i of %s\n", __LINE__, __FILE__)
 #define fr(i, bound) for (int i = 0; i < (bound); i++)
@@ -42,7 +41,7 @@ enum astNodeIds {
     // not outputs
       ani_structDef,
       ani_fnDef,
-      ani_root,
+      ani_rootDef,
       ani_atfile,
     // outputs
       ani_text,
@@ -66,26 +65,29 @@ enum astNodeIds {
 };
 
 typedef struct {
-	char *name;         // includes types
-  int   kidsRequired; // number of nodes that should link to this as "parent"
+	char *name;    // includes types
+  int   kidsReq; // number of nodes that should link to this as "parent"
 } astNodeDef;
 
 #define builtinsCount 5
 const astNodeDef builtins[builtinsCount] = {
-	{.name=":num + :num l :num r", .kidsRequired=2},
-	{.name=":num - :num l :num r", .kidsRequired=2},
-	{.name=":num * :num l :num r", .kidsRequired=2},
-	{.name=":num / :num l :num r", .kidsRequired=2},
-	{.name=":num nine",            .kidsRequired=0}
+	{.name=" :num + :num l :num r "+6, .kidsReq=2},
+	{.name=" :num - :num l :num r "+6, .kidsReq=2},
+	{.name=" :num * :num l :num r "+6, .kidsReq=2},
+	{.name=" :num / :num l :num r "+6, .kidsReq=2},
+	{.name=" :num nine "+6,            .kidsReq=0}
 };
 
 typedef struct {
-  astNodeDef      def;
+	char           *name;
+  int             kidsReq;
+	int             kidCount; // incremented until it matches parent's kidsReq
 	int             id;
-  int             kidCount;  // incremented until it matches parent's kidsRequired
 	struct astNode *parent;
-  struct astNode *idSource;  // source of what's being called (fnDef, root, structDef, multiplexer)
-  int             idSourceRelation; // index of thing relative to source (nth param, struct member, multiplexer ctx)
+  struct astNode *idSource; // source of what's being called (fnDef, root, structDef, multiplexer)
+  int             idSourceRel; // index of thing relative to source (nth param, struct member, multiplexer ctx)
+	typeBox         litVal;
+	int             line;
 } astNode;
 
 #define SpaceCase case '\n': case '\t': case ' '
@@ -97,25 +99,15 @@ BufType(astNode,  astNodeBuf);
 
 astNodeBuf   astNodes;
 
-
-
-
-
-
-
-
-
-
 void deorphan(astNode *const orphan) {
 	for (astNode *p = orphan-1; p >= astNodes.data; p--) {
-		if (p->def.fn == sl_rootDef && p->kidCount) {
+		if (p->id == ani_rootDef && p->kidCount) {
 			printErrorHead(orphan->line);
-			printf("'"); printUpTo(orphan->def.name, tokSep);
+			printf("'"); printUpTo(orphan->name, tokSep);
 			printf("' has no parent.\n");
 			return;
 		}
-		if (p->kidCount < p->def.arity) {
-			astKids.data[p->kidsIndx + p->kidCount] = orphan;
+		if (p->kidCount < p->kidsReq) {
 			p->kidCount++;
 			return;
 		}
@@ -132,29 +124,30 @@ void nodeFromToken(char *token, uint32_t line) {
 		('0' <= *token && *token <= '9')  ||
 		(*token == '-' && '0' <= token[1] && token[1] <= '9')
 	) {
-		lastNode->def.name   = token;
-		lastNode->def.arity  = 0;
-		lastNode->def.fn     = sl_numLit;
-		lastNode->kidsIndx   = UINT32_MAX;
-		lastNode->kidCount   = 0;
-		lastNode->line       = line;
-		lastNode->litVal.num = atof(token);
+		lastNode->name        = token;
+		lastNode->kidsReq     = 0;
+		lastNode->id          = ani_numLit;
+		lastNode->parent      = NULL;
+		lastNode->idSource    = NULL;
+		lastNode->idSourceRel = 0;
+		lastNode->litVal.num  = atof(token);
+		lastNode->line        = line;
 		//printf("numLit: %f\n", lastNode->litVal.num);
 		deorphan(lastNode);
 		return;
 	}
-	// stdlib
-	fr (i, woodStdLibCount) {
-		if (matchUpTo(tokenPastType(&woodStdLib[i].name[0]), token, tokSep)) {
-			lastNode->def        = woodStdLib[i];
-			lastNode->line       = line;
-			lastNode->kidCount   = 0;
-			lastNode->litVal.num = 0;
-			const uint32_t arity = lastNode->def.arity;
-			if (arity) {
-				pushNEmpty_astNodePBuf(&astKids, arity);
-				lastNode->kidsIndx = astKids.count - arity;
-			}
+	// builtin
+	fr (i, builtinsCount) {
+		if (matchUpTo(builtins[i].name, token, tokSep)) {
+			lastNode->name        = builtins[i].name;
+			lastNode->kidsReq     = builtins[i].kidsReq;
+			lastNode->kidCount    = 0;
+			lastNode->id          = ani_builtinCall;
+			lastNode->parent      = NULL;
+			lastNode->idSource    = NULL;
+			lastNode->idSourceRel = 0;
+			lastNode->litVal.num  = 0;
+			lastNode->line        = line;
 			deorphan(lastNode);
 			return;
 		}
@@ -163,16 +156,18 @@ void nodeFromToken(char *token, uint32_t line) {
 	fr (i, astNodes.count) {
 		// root
 		if (
-			astNodes.data[i].def.fn == sl_rootDef  &&
-			matchUpTo(tokenPastType(astNodes.data[i].def.name), token, tokSep)
+			astNodes.data[i].id == ani_rootDef  &&
+			matchUpTo(astNodes.data[i].name, token, tokSep)
 		) {
-			lastNode->def.name   = astNodes.data[i].def.name;
-			lastNode->def.arity  = 0;
-			lastNode->def.fn     = sl_rootRef;
-			lastNode->line       = line;
-			lastNode->kidsIndx   = UINT32_MAX;
-			lastNode->kidCount   = 0;
-			lastNode->litVal.num = 0;
+			lastNode->name        = astNodes.data[i].name;
+			lastNode->kidsReq     = 0;
+			lastNode->kidCount    = 0;
+			lastNode->id          = ani_rootCall;
+			lastNode->parent      = NULL;
+			lastNode->idSource    = NULL;
+			lastNode->idSourceRel = 0;
+			lastNode->litVal.num  = 0;
+			lastNode->line        = line;
 			deorphan(lastNode);
 			return;
 		}
@@ -186,30 +181,37 @@ void rootFromToken(char *token, uint32_t line) {
 	printf("rootFromToken: "); printUpTo(token, tokSep); puts("");
 	pushEmpty_astNodeBuf(&astNodes);
 	astNode *const lastNode = plast_astNodeBuf(astNodes);
-	lastNode->def.name   = token;
-	lastNode->def.arity  = 1;
-	lastNode->def.fn     = sl_rootDef;
-	lastNode->line       = line;
-	lastNode->kidCount   = 0;
-	lastNode->litVal.num = 0;
-	for (astNode *n = lastNode; n->def.fn != sl_rootDef; n--) {
+	lastNode->name        = token;
+	lastNode->kidsReq     = 1;
+	lastNode->kidCount    = 0;
+	lastNode->id          = ani_rootDef;
+	lastNode->parent      = NULL;
+	lastNode->idSource    = NULL;
+	lastNode->idSourceRel = 0;
+	lastNode->litVal.num  = 0;
+	lastNode->line        = line;
+	for (astNode *n = lastNode; n->id != ani_rootDef; n--) {
 		if (n < astNodes.data) {
 			_ShouldNotBeHere_;
 			return;
 		}
-		if (n->kidCount < n->def.arity) {
+		if (n->kidCount < n->kidsReq) {
 			printErrorHead(line);
-			printf("'"); printUpTo(n->def.name, tokSep);
+			printf("'"); printUpTo(n->name, tokSep);
 			printf("' has too few arguments.\n");
 			return;
 		}
 	}
-	pushEmpty_astNodePBuf(&astKids);
-	lastNode->kidsIndx = astKids.count-1;
 }
 
 void handleToken(char *token, uint32_t line) {
+	static int nextToken = -1;
 	switch (*token) {typeCharCase:
+		nextToken = ani_rootDef;
+		return;
+	}
+	if (nextToken == ani_rootDef) {
+		nextToken = -1;
 		rootFromToken(token, line);
 		return;
 	}
@@ -231,7 +233,6 @@ int main(int argc, char **argv) {
 	uint32_t curLine      = 1;
 	uint32_t commentDepth = 0;
 	astNodes       = init_astNodeBuf(32);
-	astKids        = init_astNodePBuf(32);
 	charBuf tokens = init_charBuf(256);
 	push_charBuf(&tokens, tokSep); // to look back on without going OOB
 	char *tokenStart = tokens.data + 1;
@@ -262,12 +263,11 @@ int main(int argc, char **argv) {
 	if (commentDepth) puts("Warning: unclosed comment\n");
 	fr (i, astNodes.count) {
 		printf("%3i: ", astNodes.data[i].line);
-		printUpTo(astNodes.data[i].def.name, tokSep);
+		printUpTo(astNodes.data[i].name, tokSep);
 		puts("");
 	}
 	fclose(infile);
 	free(astNodes.data);
-	free(astKids.data);
 	free(tokens.data);
 	return 0;
 }
