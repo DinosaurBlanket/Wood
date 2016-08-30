@@ -1,14 +1,26 @@
+#pragma once
 
 #include <stdlib.h>
 #include <string.h>
 
 
-#define BufType(type, structName)\
+#define BufTypeHead(type, structName)\
 typedef struct {\
   type     *data;\
   uint32_t  count;\
   uint32_t  space;\
 } structName;\
+structName init_ ## structName (uint32_t space);\
+void push_ ## structName (structName *b, type c);\
+void pushEmpty_ ## structName (structName *b);\
+void pushNEmpty_ ## structName (structName *b, uint32_t n);\
+type pop_ ## structName (structName *b);\
+void trim_ ## structName (structName *b);\
+void clear_ ## structName (structName *b);\
+type last_ ## structName (structName b);\
+type *plast_ ## structName (structName b);
+
+#define BufType(type, structName)\
 structName init_ ## structName (uint32_t space) {\
   structName b;\
   b.space = space;\
